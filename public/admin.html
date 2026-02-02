@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - lui.re</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 2em;
+        }
+
+        .add-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .add-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .stats {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            display: flex;
+            gap: 40px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .table-container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #f8f9fa;
+        }
+
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #555;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .short-link {
+            color: #667eea;
+            font-weight: 500;
+        }
+
+        .url-cell {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-edit {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background: #059669;
+        }
+
+        .btn-delete {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #dc2626;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            margin-bottom: 25px;
+        }
+
+        .modal-header h2 {
+            color: #333;
+            font-size: 1.8em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        .btn-primary {
+            flex: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            flex: 1;
+            background: #e0e0e0;
+            color: #555;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 18px;
+        }
+
+        .error {
+            background: #fee;
+            border-left: 4px solid #f44;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            color: #c33;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .stats {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .url-cell {
+                max-width: 150px;
+            }
+
+            .actions {
+                flex-direction: column;
+            }
+
+            table {
+                font-size: 14px;
+            }
+
+            th, td {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔧 Admin Panel</h1>
+            <button class="add-btn" onclick="openAddModal()">+ Add New URL</button>
+        </header>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-number" id="totalUrls">0</div>
+                <div class="stat-label">Total URLs</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number" id="totalClicks">0</div>
+                <div class="stat-label">Total Clicks</div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div id="loading" class="loading">Loading...</div>
+            <div id="error" class="error" style="display: none;"></div>
+            <table id="urlTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Short Code</th>
+                        <th>Original URL</th>
+                        <th>Clicks</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="urlTableBody"></tbody>
+            </table>
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <h3>No URLs yet</h3>
+                <p>Click "Add New URL" to create your first short link!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add New URL</h2>
+            </div>
+            <form id="urlForm" onsubmit="saveUrl(event)">
+                <div class="form-group">
+                    <label for="shortCode">Short Code</label>
+                    <input type="text" id="shortCode" pattern="[a-zA-Z0-9_-]+" 
+                           title="Only letters, numbers, hyphens, and underscores" required>
+                </div>
+                <div class="form-group">
+                    <label for="originalUrl">Original URL</label>
+                    <input type="url" id="originalUrl" placeholder="https://example.com" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentEditId = null;
+        let allUrls = [];
+
+        // Load URLs on page load
+        document.addEventListener('DOMContentLoaded', loadUrls);
+
+        async function loadUrls() {
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const table = document.getElementById('urlTable');
+            const emptyState = document.getElementById('emptyState');
+
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            table.style.display = 'none';
+            emptyState.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/admin/urls');
+                if (!response.ok) throw new Error('Failed to load URLs');
+                
+                allUrls = await response.json();
+                
+                loading.style.display = 'none';
+
+                if (allUrls.length === 0) {
+                    emptyState.style.display = 'block';
+                    document.getElementById('totalUrls').textContent = '0';
+                    document.getElementById('totalClicks').textContent = '0';
+                } else {
+                    table.style.display = 'table';
+                    renderTable();
+                    updateStats();
+                }
+            } catch (err) {
+                loading.style.display = 'none';
+                error.textContent = 'Error loading URLs: ' + err.message;
+                error.style.display = 'block';
+            }
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('urlTableBody');
+            tbody.innerHTML = '';
+
+            allUrls.forEach(url => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><span class="short-link">lui.re/${url.short_code}</span></td>
+                    <td class="url-cell" title="${url.original_url}">${url.original_url}</td>
+                    <td>${url.click_count}</td>
+                    <td>${new Date(url.created_at).toLocaleDateString()}</td>
+                    <td>
+                        <div class="actions">
+                            <button class="btn btn-edit" onclick="openEditModal(${url.id})">Edit</button>
+                            <button class="btn btn-delete" onclick="deleteUrl(${url.id}, '${url.short_code}')">Delete</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateStats() {
+            document.getElementById('totalUrls').textContent = allUrls.length;
+            const totalClicks = allUrls.reduce((sum, url) => sum + url.click_count, 0);
+            document.getElementById('totalClicks').textContent = totalClicks;
+        }
+
+        function openAddModal() {
+            currentEditId = null;
+            document.getElementById('modalTitle').textContent = 'Add New URL';
+            document.getElementById('shortCode').value = '';
+            document.getElementById('originalUrl').value = '';
+            document.getElementById('modal').classList.add('show');
+        }
+
+        function openEditModal(id) {
+            const url = allUrls.find(u => u.id === id);
+            if (!url) return;
+
+            currentEditId = id;
+            document.getElementById('modalTitle').textContent = 'Edit URL';
+            document.getElementById('shortCode').value = url.short_code;
+            document.getElementById('originalUrl').value = url.original_url;
+            document.getElementById('modal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('show');
+        }
+
+        async function saveUrl(event) {
+            event.preventDefault();
+
+            const shortCode = document.getElementById('shortCode').value;
+            const originalUrl = document.getElementById('originalUrl').value;
+
+            try {
+                let response;
+                if (currentEditId) {
+                    // Update existing URL
+                    response = await fetch(`/api/admin/urls/${currentEditId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ short_code: shortCode, original_url: originalUrl })
+                    });
+                } else {
+                    // Add new URL using the existing shorten endpoint
+                    response = await fetch('/api/shorten', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: originalUrl, customCode: shortCode })
+                    });
+                }
+
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.error || 'Failed to save URL');
+                }
+
+                closeModal();
+                loadUrls();
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function deleteUrl(id, shortCode) {
+            if (!confirm(`Are you sure you want to delete "lui.re/${shortCode}"?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/urls/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to delete URL');
+                }
+
+                loadUrls();
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>
