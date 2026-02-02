@@ -2,9 +2,11 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const crypto = require('crypto');
+const session = require('express-session');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme123';
 
 // Initialize SQLite database in persistent storage
 const dbPath = process.env.DB_PATH || './urls.db';
@@ -26,6 +28,17 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
 // Middleware
 app.use(express.json());
+
+// Session middleware for admin authentication
+app.use(session({
+  secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
 
 // Smart routing based on hostname
 app.use((req, res, next) => {
@@ -133,8 +146,38 @@ app.get('/api/stats/:shortCode', (req, res) => {
   );
 });
 
+// Admin authentication endpoints
+app.post('/api/admin/login', (req, res) => {
+  const { password } = req.body;
+  
+  if (password === ADMIN_PASSWORD) {
+    req.session.adminAuthenticated = true;
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ error: 'Invalid password' });
+  }
+});
+
+app.post('/api/admin/logout', (req, res) => {
+  req.session.destroy();
+  res.json({ success: true });
+});
+
+app.get('/api/admin/check', (req, res) => {
+  res.json({ authenticated: req.session.adminAuthenticated === true });
+});
+
+// Middleware to protect admin routes
+function requireAdminAuth(req, res, next) {
+  if (req.session.adminAuthenticated === true) {
+    next();
+  } else {
+    res.status(401).json({ error: 'Authentication required' });
+  }
+}
+
 // Admin API: Get all URLs
-app.get('/api/admin/urls', (req, res) => {
+app.get('/api/admin/urls', requireAdminAuth, (req, res) => {
   db.all(
     'SELECT id, short_code, original_url, created_at, click_count FROM urls ORDER BY created_at DESC',
     [],
@@ -148,7 +191,7 @@ app.get('/api/admin/urls', (req, res) => {
 });
 
 // Admin API: Update URL
-app.put('/api/admin/urls/:id', (req, res) => {
+app.put('/api/admin/urls/:id', requireAdminAuth, (req, res) => {
   const { id } = req.params;
   const { short_code, original_url } = req.body;
   
@@ -187,7 +230,7 @@ app.put('/api/admin/urls/:id', (req, res) => {
 });
 
 // Admin API: Delete URL
-app.delete('/api/admin/urls/:id', (req, res) => {
+app.delete('/api/admin/urls/:id', requireAdminAuth, (req, res) => {
   const { id } = req.params;
   
   db.run('DELETE FROM urls WHERE id = ?', [id], function(err) {
