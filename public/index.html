@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>lui.re - URL Shortener</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #555;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .custom-code-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .domain-prefix {
+            color: #666;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .result.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .short-url {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .short-url input {
+            flex: 1;
+            padding: 12px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .copy-btn {
+            padding: 12px 24px;
+            width: auto;
+            background: #10b981;
+            white-space: nowrap;
+        }
+
+        .copy-btn:hover {
+            background: #059669;
+        }
+
+        .copy-btn.copied {
+            background: #6366f1;
+        }
+
+        .error {
+            margin-top: 15px;
+            padding: 15px;
+            background: #fee;
+            border-left: 4px solid #f44;
+            border-radius: 5px;
+            color: #c33;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .stats-link {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #667eea;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .stats-link:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .custom-code-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>lui.re</h1>
+        <p class="subtitle">Make your links shorter and sweeter</p>
+
+        <form id="shortenForm">
+            <div class="input-group">
+                <label for="urlInput">Enter your long URL</label>
+                <input 
+                    type="text" 
+                    id="urlInput" 
+                    placeholder="https://example.com/very/long/url/that/needs/shortening"
+                    required
+                >
+            </div>
+
+            <div class="input-group">
+                <label for="customCode">Custom short code (optional)</label>
+                <div class="custom-code-group">
+                    <span class="domain-prefix">lui.re/</span>
+                    <input 
+                        type="text" 
+                        id="customCode" 
+                        placeholder="mycode"
+                        pattern="[a-zA-Z0-9_-]+"
+                        title="Only letters, numbers, hyphens, and underscores allowed"
+                    >
+                </div>
+            </div>
+
+            <button type="submit" id="submitBtn">Shorten URL</button>
+        </form>
+
+        <div id="error" class="error"></div>
+
+        <div id="result" class="result">
+            <h3>Your shortened URL:</h3>
+            <div class="short-url">
+                <input type="text" id="shortUrlDisplay" readonly>
+                <button class="copy-btn" id="copyBtn">Copy</button>
+            </div>
+            <a href="#" id="statsLink" class="stats-link" target="_blank">View statistics</a>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('shortenForm');
+        const urlInput = document.getElementById('urlInput');
+        const customCode = document.getElementById('customCode');
+        const submitBtn = document.getElementById('submitBtn');
+        const result = document.getElementById('result');
+        const shortUrlDisplay = document.getElementById('shortUrlDisplay');
+        const copyBtn = document.getElementById('copyBtn');
+        const errorDiv = document.getElementById('error');
+        const statsLink = document.getElementById('statsLink');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const url = urlInput.value.trim();
+            const custom = customCode.value.trim();
+
+            // Hide previous results and errors
+            result.classList.remove('show');
+            errorDiv.classList.remove('show');
+            
+            // Disable button
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Shortening...';
+
+            try {
+                const response = await fetch('/api/shorten', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        url: url,
+                        customCode: custom || undefined
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to shorten URL');
+                }
+
+                // Show result
+                shortUrlDisplay.value = data.shortUrl;
+                statsLink.href = `/api/stats/${data.shortCode}`;
+                result.classList.add('show');
+                copyBtn.textContent = 'Copy';
+                copyBtn.classList.remove('copied');
+
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.classList.add('show');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Shorten URL';
+            }
+        });
+
+        copyBtn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(shortUrlDisplay.value);
+                copyBtn.textContent = 'Copied!';
+                copyBtn.classList.add('copied');
+                
+                setTimeout(() => {
+                    copyBtn.textContent = 'Copy';
+                    copyBtn.classList.remove('copied');
+                }, 2000);
+            } catch (error) {
+                // Fallback for older browsers
+                shortUrlDisplay.select();
+                document.execCommand('copy');
+                copyBtn.textContent = 'Copied!';
+            }
+        });
+
+        // Clear error when user starts typing
+        urlInput.addEventListener('input', () => {
+            errorDiv.classList.remove('show');
+        });
+
+        customCode.addEventListener('input', () => {
+            errorDiv.classList.remove('show');
+        });
+    </script>
+</body>
+</html>
