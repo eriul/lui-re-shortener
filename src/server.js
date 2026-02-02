@@ -2,20 +2,21 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const crypto = require('crypto');
-const session = require('express-session');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme123';
 
-// Initialize SQLite database in persistent storage
+// Simple in-memory session store (tokens valid for 24 hours)
+const sessions = new Map();
+
+// Initialize SQLite database
 const dbPath = process.env.DB_PATH || './urls.db';
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Error opening database:', err);
   } else {
     console.log(`Connected to SQLite database at ${dbPath}`);
-    // Create table if it doesn't exist
     db.run(`CREATE TABLE IF NOT EXISTS urls (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       short_code TEXT UNIQUE NOT NULL,
@@ -29,22 +30,10 @@ const db = new sqlite3.Database(dbPath, (err) => {
 // Middleware
 app.use(express.json());
 
-// Session middleware for admin authentication
-app.use(session({
-  secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex'),
-  resave: false,
-  saveUninitialized: false,
-  cookie: { 
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
-}));
-
 // Smart routing based on hostname
 app.use((req, res, next) => {
   const hostname = req.hostname || req.get('host');
   
-  // If accessing from admin subdomain and requesting root, serve admin panel
   if (hostname.startsWith('admin.') && req.path === '/') {
     return res.sendFile('admin.html', { root: './public' });
   }
@@ -65,6 +54,57 @@ function generateShortCode(length = 6) {
   return result;
 }
 
+// Clean up expired sessions every hour
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, expiry] of sessions.entries()) {
+    if (expiry < now) {
+      sessions.delete(token);
+    }
+  }
+}, 60 * 60 * 1000);
+
+// Admin authentication endpoints
+app.post('/api/admin/login', (req, res) => {
+  const { password } = req.body;
+  
+  if (password === ADMIN_PASSWORD) {
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiry = Date.now() + (24 * 60 * 60 * 1000); // 24 hours
+    sessions.set(token, expiry);
+    res.json({ success: true, token });
+  } else {
+    res.status(401).json({ error: 'Invalid password' });
+  }
+});
+
+app.post('/api/admin/logout', (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (token) {
+    sessions.delete(token);
+  }
+  res.json({ success: true });
+});
+
+app.get('/api/admin/check', (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  const expiry = sessions.get(token);
+  const authenticated = expiry && expiry > Date.now();
+  res.json({ authenticated });
+});
+
+// Middleware to protect admin routes
+function requireAdminAuth(req, res, next) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  const expiry = sessions.get(token);
+  
+  if (expiry && expiry > Date.now()) {
+    next();
+  } else {
+    res.status(401).json({ error: 'Authentication required' });
+  }
+}
+
 // API endpoint to create short URL
 app.post('/api/shorten', async (req, res) => {
   const { url, customCode } = req.body;
@@ -73,7 +113,6 @@ app.post('/api/shorten', async (req, res) => {
     return res.status(400).json({ error: 'URL is required' });
   }
 
-  // Basic URL validation
   try {
     new URL(url);
   } catch (e) {
@@ -82,23 +121,19 @@ app.post('/api/shorten', async (req, res) => {
 
   let shortCode = customCode || generateShortCode();
   
-  // Validate custom code if provided
   if (customCode && !/^[a-zA-Z0-9_-]+$/.test(customCode)) {
     return res.status(400).json({ error: 'Custom code can only contain letters, numbers, hyphens, and underscores' });
   }
 
-  // Insert into database
   db.run(
     'INSERT INTO urls (short_code, original_url) VALUES (?, ?)',
     [shortCode, url],
     function(err) {
       if (err) {
         if (err.message.includes('UNIQUE constraint failed')) {
-          // If custom code or random code conflicts, try again with random
           if (customCode) {
             return res.status(400).json({ error: 'Custom code already in use' });
           } else {
-            // Recursively try with a new random code
             shortCode = generateShortCode();
             db.run(
               'INSERT INTO urls (short_code, original_url) VALUES (?, ?)',
@@ -146,36 +181,6 @@ app.get('/api/stats/:shortCode', (req, res) => {
   );
 });
 
-// Admin authentication endpoints
-app.post('/api/admin/login', (req, res) => {
-  const { password } = req.body;
-  
-  if (password === ADMIN_PASSWORD) {
-    req.session.adminAuthenticated = true;
-    res.json({ success: true });
-  } else {
-    res.status(401).json({ error: 'Invalid password' });
-  }
-});
-
-app.post('/api/admin/logout', (req, res) => {
-  req.session.destroy();
-  res.json({ success: true });
-});
-
-app.get('/api/admin/check', (req, res) => {
-  res.json({ authenticated: req.session.adminAuthenticated === true });
-});
-
-// Middleware to protect admin routes
-function requireAdminAuth(req, res, next) {
-  if (req.session.adminAuthenticated === true) {
-    next();
-  } else {
-    res.status(401).json({ error: 'Authentication required' });
-  }
-}
-
 // Admin API: Get all URLs
 app.get('/api/admin/urls', requireAdminAuth, (req, res) => {
   db.all(
@@ -199,14 +204,12 @@ app.put('/api/admin/urls/:id', requireAdminAuth, (req, res) => {
     return res.status(400).json({ error: 'Short code and URL are required' });
   }
   
-  // Validate URL
   try {
     new URL(original_url);
   } catch (e) {
     return res.status(400).json({ error: 'Invalid URL format' });
   }
   
-  // Validate short code
   if (!/^[a-zA-Z0-9_-]+$/.test(short_code)) {
     return res.status(400).json({ error: 'Invalid short code format' });
   }
@@ -248,7 +251,6 @@ app.delete('/api/admin/urls/:id', requireAdminAuth, (req, res) => {
 app.get('/:shortCode', (req, res) => {
   const { shortCode } = req.params;
   
-  // Skip API routes and static files
   if (shortCode.startsWith('api') || shortCode.includes('.')) {
     return res.status(404).send('Not found');
   }
@@ -263,10 +265,7 @@ app.get('/:shortCode', (req, res) => {
       return res.status(404).send('Short URL not found');
     }
     
-    // Increment click count
     db.run('UPDATE urls SET click_count = click_count + 1 WHERE short_code = ?', [shortCode]);
-    
-    // Redirect to original URL
     res.redirect(301, row.original_url);
   });
 });
