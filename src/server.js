@@ -119,6 +119,74 @@ app.get('/api/stats/:shortCode', (req, res) => {
   );
 });
 
+// Admin API: Get all URLs
+app.get('/api/admin/urls', (req, res) => {
+  db.all(
+    'SELECT id, short_code, original_url, created_at, click_count FROM urls ORDER BY created_at DESC',
+    [],
+    (err, rows) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      res.json(rows || []);
+    }
+  );
+});
+
+// Admin API: Update URL
+app.put('/api/admin/urls/:id', (req, res) => {
+  const { id } = req.params;
+  const { short_code, original_url } = req.body;
+  
+  if (!short_code || !original_url) {
+    return res.status(400).json({ error: 'Short code and URL are required' });
+  }
+  
+  // Validate URL
+  try {
+    new URL(original_url);
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid URL format' });
+  }
+  
+  // Validate short code
+  if (!/^[a-zA-Z0-9_-]+$/.test(short_code)) {
+    return res.status(400).json({ error: 'Invalid short code format' });
+  }
+  
+  db.run(
+    'UPDATE urls SET short_code = ?, original_url = ? WHERE id = ?',
+    [short_code, original_url, id],
+    function(err) {
+      if (err) {
+        if (err.message.includes('UNIQUE constraint failed')) {
+          return res.status(400).json({ error: 'Short code already in use' });
+        }
+        return res.status(500).json({ error: 'Database error' });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'URL not found' });
+      }
+      res.json({ success: true });
+    }
+  );
+});
+
+// Admin API: Delete URL
+app.delete('/api/admin/urls/:id', (req, res) => {
+  const { id } = req.params;
+  
+  db.run('DELETE FROM urls WHERE id = ?', [id], function(err) {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    if (this.changes === 0) {
+      return res.status(404).json({ error: 'URL not found' });
+    }
+    res.json({ success: true });
+  });
+});
+
 // Redirect short URL to original URL
 app.get('/:shortCode', (req, res) => {
   const { shortCode } = req.params;
