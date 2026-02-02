@@ -401,19 +401,29 @@
     <script>
         let currentEditId = null;
         let allUrls = [];
+        let authToken = localStorage.getItem('adminToken');
 
         // Check authentication on page load
         document.addEventListener('DOMContentLoaded', checkAuth);
 
         async function checkAuth() {
+            if (!authToken) {
+                document.getElementById('loginModal').style.display = 'flex';
+                return;
+            }
+
             try {
-                const response = await fetch('/api/admin/check');
+                const response = await fetch('/api/admin/check', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
                 const data = await response.json();
                 
                 if (data.authenticated) {
                     document.getElementById('loginModal').style.display = 'none';
                     loadUrls();
                 } else {
+                    authToken = null;
+                    localStorage.removeItem('adminToken');
                     document.getElementById('loginModal').style.display = 'flex';
                 }
             } catch (err) {
@@ -437,7 +447,11 @@
                     body: JSON.stringify({ password })
                 });
                 
-                if (response.ok) {
+                const data = await response.json();
+                
+                if (response.ok && data.token) {
+                    authToken = data.token;
+                    localStorage.setItem('adminToken', authToken);
                     document.getElementById('loginModal').style.display = 'none';
                     document.getElementById('password').value = '';
                     loadUrls();
@@ -457,12 +471,17 @@
             }
             
             try {
-                await fetch('/api/admin/logout', { method: 'POST' });
-                window.location.reload();
+                await fetch('/api/admin/logout', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
             } catch (err) {
                 console.error('Logout failed:', err);
-                window.location.reload();
             }
+            
+            authToken = null;
+            localStorage.removeItem('adminToken');
+            window.location.reload();
         }
 
         async function loadUrls() {
@@ -477,7 +496,9 @@
             emptyState.style.display = 'none';
 
             try {
-                const response = await fetch('/api/admin/urls');
+                const response = await fetch('/api/admin/urls', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
                 if (!response.ok) throw new Error('Failed to load URLs');
                 
                 allUrls = await response.json();
@@ -560,14 +581,15 @@
             try {
                 let response;
                 if (currentEditId) {
-                    // Update existing URL
                     response = await fetch(`/api/admin/urls/${currentEditId}`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${authToken}`
+                        },
                         body: JSON.stringify({ short_code: shortCode, original_url: originalUrl })
                     });
                 } else {
-                    // Add new URL using the existing shorten endpoint
                     response = await fetch('/api/shorten', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -594,7 +616,8 @@
 
             try {
                 const response = await fetch(`/api/admin/urls/${id}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
                 });
 
                 if (!response.ok) {
