@@ -316,7 +316,10 @@
     <div class="container">
         <header>
             <h1>🔧 Admin Panel</h1>
-            <button class="add-btn" onclick="openAddModal()">+ Add New URL</button>
+            <div style="display: flex; gap: 10px;">
+                <button class="add-btn" onclick="openAddModal()">+ Add New URL</button>
+                <button class="btn-secondary" onclick="logout()" style="padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer;">Logout</button>
+            </div>
         </header>
 
         <div class="stats">
@@ -376,12 +379,91 @@
         </div>
     </div>
 
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal" style="display: flex;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔒 Admin Login</h2>
+            </div>
+            <form id="loginForm" onsubmit="login(event)">
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="Enter admin password" required autofocus>
+                </div>
+                <div id="loginError" class="error" style="display: none; margin-top: 15px;"></div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn-primary">Login</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         let currentEditId = null;
         let allUrls = [];
 
-        // Load URLs on page load
-        document.addEventListener('DOMContentLoaded', loadUrls);
+        // Check authentication on page load
+        document.addEventListener('DOMContentLoaded', checkAuth);
+
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/admin/check');
+                const data = await response.json();
+                
+                if (data.authenticated) {
+                    document.getElementById('loginModal').style.display = 'none';
+                    loadUrls();
+                } else {
+                    document.getElementById('loginModal').style.display = 'flex';
+                }
+            } catch (err) {
+                console.error('Auth check failed:', err);
+                document.getElementById('loginModal').style.display = 'flex';
+            }
+        }
+
+        async function login(event) {
+            event.preventDefault();
+            
+            const password = document.getElementById('password').value;
+            const loginError = document.getElementById('loginError');
+            
+            loginError.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                
+                if (response.ok) {
+                    document.getElementById('loginModal').style.display = 'none';
+                    document.getElementById('password').value = '';
+                    loadUrls();
+                } else {
+                    loginError.textContent = 'Invalid password';
+                    loginError.style.display = 'block';
+                }
+            } catch (err) {
+                loginError.textContent = 'Login failed: ' + err.message;
+                loginError.style.display = 'block';
+            }
+        }
+
+        async function logout() {
+            if (!confirm('Are you sure you want to logout?')) {
+                return;
+            }
+            
+            try {
+                await fetch('/api/admin/logout', { method: 'POST' });
+                window.location.reload();
+            } catch (err) {
+                console.error('Logout failed:', err);
+                window.location.reload();
+            }
+        }
 
         async function loadUrls() {
             const loading = document.getElementById('loading');
