@@ -6,12 +6,13 @@ const crypto = require('crypto');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Initialize SQLite database
-const db = new sqlite3.Database('./urls.db', (err) => {
+// Initialize SQLite database in persistent storage
+const dbPath = process.env.DB_PATH || './urls.db';
+const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Error opening database:', err);
   } else {
-    console.log('Connected to SQLite database');
+    console.log(`Connected to SQLite database at ${dbPath}`);
     // Create table if it doesn't exist
     db.run(`CREATE TABLE IF NOT EXISTS urls (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,6 +26,19 @@ const db = new sqlite3.Database('./urls.db', (err) => {
 
 // Middleware
 app.use(express.json());
+
+// Smart routing based on hostname
+app.use((req, res, next) => {
+  const hostname = req.hostname || req.get('host');
+  
+  // If accessing from admin subdomain and requesting root, serve admin panel
+  if (hostname.startsWith('admin.') && req.path === '/') {
+    return res.sendFile('admin.html', { root: './public' });
+  }
+  
+  next();
+});
+
 app.use(express.static('public'));
 
 // Generate a random short code
